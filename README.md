@@ -96,6 +96,29 @@ feat: add navigation link for documentation and update ignore files
 
 Pass `--no-body` (or `GITPUSH_BODY=0`) for a single-line subject instead.
 
+### Pick which AI writes the message
+
+`--tool claude|codex` forces the generator regardless of where you're running.
+So from a Claude session you can have **Codex** write the commit:
+
+```bash
+bash skills/gitpush/scripts/gitpush.sh --auto --tool codex
+```
+
+## MCP server (any MCP client)
+
+Prefer a callable tool over a skill file? `mcp/server.js` is a zero-dependency
+Node stdio MCP server that exposes a **`gitpush`** tool, so Claude Code, Codex,
+Cursor, OpenCode, Windsurf, and other MCP clients can stage + commit + push
+directly. The `tool` argument selects the target generator (e.g. call with
+`{auto:true, tool:"codex"}`). Per-client config is in
+[`skills/gitpush/mcp/README.md`](skills/gitpush/mcp/README.md).
+
+```bash
+# Claude Code, for example:
+claude mcp add gitpush -- node ~/.claude/skills/gitpush/mcp/server.js
+```
+
 ## Auto mode (optional)
 
 Want it to commit + push automatically every time the agent finishes? Wire the

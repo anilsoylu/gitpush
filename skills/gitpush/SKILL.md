@@ -61,6 +61,25 @@ feat: add navigation link for documentation and update ignore files
 Add `--no-body` for a single-line subject instead. If the cheap model isn't
 reachable it falls back to a heuristic message, so it never blocks the commit.
 
+#### Choosing which AI writes the message (target)
+
+By default `--auto` uses whichever tool you're in. To force a different one —
+e.g. the user says **"gitpush codex"**, **"gitpush with codex"**, or
+**"/gitpush codex"** — pass `--tool` so that tool generates the message even
+if you're running inside another agent:
+
+```bash
+# You're in Claude, but Codex writes the commit message:
+bash "$SKILL_DIR/scripts/gitpush.sh" --auto --tool codex
+
+# Force Claude (haiku) as the generator:
+bash "$SKILL_DIR/scripts/gitpush.sh" --auto --tool claude
+```
+
+Whenever the user names a tool alongside the gitpush request, treat it as the
+target and pass it via `--tool`. The named tool's CLI must be installed; if it
+isn't reachable, gitpush falls back to a heuristic message.
+
 ### Manual mode — `-m` (when you want exact wording)
 
 If you write the message yourself, **do NOT read the full diff** (it burns
@@ -104,6 +123,15 @@ uses.
 a turn. It is **opt-in** and only runs when `GITPUSH_AUTO=1` is set, so it never
 fires by accident. See the repo README for wiring it into Claude Code's `Stop`
 hook or Codex's equivalent.
+
+## MCP server (use from any MCP client)
+
+`mcp/server.js` exposes the same behaviour as an MCP tool named `gitpush`, so
+MCP-capable clients (Claude Code, Codex, Cursor, OpenCode, Windsurf, …) can call
+it directly. It's a zero-dependency Node stdio server that wraps
+`scripts/gitpush.sh`. Tool arguments mirror the flags: `message`, `auto`,
+`body`, `push`, `deeplink`, `coauthor`, `tool` (target), `cwd`, `dry_run`.
+See `mcp/README.md` for per-client config.
 
 ## Notes
 
