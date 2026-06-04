@@ -35,35 +35,65 @@ neither, so there is zero AI footprint.
 
 ## How to use it
 
-The core logic lives in `scripts/gitpush.sh`. Always pass a real, descriptive
-commit message — generate it yourself from the actual diff. Do NOT use generic
-messages like "update files".
+The core logic lives in `scripts/gitpush.sh`. `$SKILL_DIR` below is the
+directory containing this SKILL.md (the script ships under `scripts/`).
 
-**Steps for the agent:**
+There are two ways to set the commit message. **Prefer the cheap mode** — it
+keeps your (expensive) context clean.
 
-1. Review what changed: `git -C <repo> status --short` and
-   `git -C <repo> diff --stat` (and the diff itself for context).
-2. Compose a concise Conventional-Commits style subject that describes the
-   change (e.g. `feat: add login form validation`, `fix: handle empty cart`).
-3. Run the script with that message:
+### Cheap mode — `--auto` (recommended, ~zero tokens from you)
+
+Let the script write the message itself using the detected tool's CHEAPEST
+model and LOWEST effort (Claude → `haiku` + `--effort low` + thinking off;
+Codex → `model_reasoning_effort=low`). You don't read the diff at all:
+
+```bash
+bash "$SKILL_DIR/scripts/gitpush.sh" --auto
+```
+
+By default this produces a **detailed message like Cursor/VSCode** — a
+Conventional-Commits subject plus a bullet-point body explaining the changes:
+
+```
+feat: add navigation link for documentation and update ignore files
+
+- Add a documentation link in the site header pointing to docs.launchly.dev
+- Exclude the docssite directory in .dockerignore and .gitignore
+- Add a navDocs entry to each locale JSON for the new link
+```
+
+Add `--no-body` for a single-line subject instead. If the cheap model isn't
+reachable it falls back to a heuristic message, so it never blocks the commit.
+
+### Manual mode — `-m` (when you want exact wording)
+
+If you write the message yourself, **do NOT read the full diff** (it burns
+tokens). Look only at `git -C <repo> status --short` and
+`git -C <repo> diff --stat`; that's enough for a good subject. Then:
 
 ```bash
 bash "$SKILL_DIR/scripts/gitpush.sh" -m "feat: add login form validation"
 ```
 
-`$SKILL_DIR` is the directory containing this SKILL.md. If unsure of the path,
-locate the script first (it is shipped alongside this file under `scripts/`).
+Use a concise Conventional-Commits subject (`feat:`, `fix:`, `docs:`, …). Never
+use generic messages like "update files".
 
 ### Common options
 
 | Flag | Meaning |
 | --- | --- |
-| `-m "msg"` | Commit subject (required for good messages). |
+| `--auto` | Generate a detailed message (subject + bullet body) with the cheap/low-effort model (~zero tokens from you). |
+| `--no-body` | With `--auto`, produce only the subject line. |
+| `-m "msg"` | Provide the commit subject yourself. |
 | `--no-push` | Commit only, do not push. |
 | `--deeplink` | Opt IN to a deep-link trailer (off by default). |
 | `--coauthor` | Opt IN to a `Co-Authored-By` trailer (off by default). |
 | `--tool claude\|codex` | Force tool detection. |
 | `--dry-run` | Show what would happen without changing anything. |
+
+Cost knobs (env): `GITPUSH_CLAUDE_MODEL` (default `haiku`),
+`GITPUSH_CODEX_MODEL` (default: codex's own config) tune which model `--auto`
+uses.
 
 ### Defaults that matter
 

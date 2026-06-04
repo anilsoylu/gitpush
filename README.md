@@ -54,7 +54,9 @@ bash skills/gitpush/scripts/gitpush.sh -m "fix: handle empty cart"
 
 | Flag | Meaning |
 | --- | --- |
-| `-m "msg"` | Commit subject. |
+| `--auto` | Write a detailed message (subject + bullet body) with the cheap/low-effort model (~zero tokens from your main session). |
+| `--no-body` | With `--auto`, produce only the subject line. |
+| `-m "msg"` | Provide the commit subject yourself. |
 | `--no-push` | Commit only. |
 | `--deeplink` | **Opt in** to a `claude://` / `codex://` deep-link trailer (off by default). |
 | `--coauthor` | **Opt in** to a `Co-Authored-By` trailer (off by default). |
@@ -62,6 +64,39 @@ bash skills/gitpush/scripts/gitpush.sh -m "fix: handle empty cart"
 | `--dry-run` | Preview without changing anything. |
 
 Everything that puts an AI footprint on the commit is **strictly opt-in**.
+
+## Cost / token-efficient mode
+
+Writing a commit message normally makes your main (expensive) agent read the
+diff — that burns tokens, especially on big changes. `--auto` offloads it:
+
+```bash
+bash skills/gitpush/scripts/gitpush.sh --auto
+```
+
+It spawns a **separate, throwaway** call on the cheapest setting of whichever
+tool you're in:
+
+- **Claude** → `claude -p --model haiku --effort low` with thinking disabled.
+- **Codex** → `codex exec -c model_reasoning_effort=low`.
+
+This runs in its own process and **does not change your interactive session's
+model or effort** — your Opus/high-effort session stays exactly as it is. If the
+cheap model can't be reached, it falls back to a heuristic message. Tune the
+model via `GITPUSH_CLAUDE_MODEL` / `GITPUSH_CODEX_MODEL`.
+
+By default `--auto` writes a **detailed, Cursor/VSCode-style message** — a
+Conventional-Commits subject plus a bullet body describing each change:
+
+```
+feat: add navigation link for documentation and update ignore files
+
+- Add a documentation link in the site header pointing to docs.launchly.dev
+- Exclude the docssite directory in .dockerignore and .gitignore
+- Add a navDocs entry to each locale JSON for the new link
+```
+
+Pass `--no-body` (or `GITPUSH_BODY=0`) for a single-line subject instead.
 
 ## Auto mode (optional)
 

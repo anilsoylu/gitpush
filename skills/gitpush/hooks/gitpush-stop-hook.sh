@@ -37,5 +37,6 @@ SCRIPT="$DIR/../scripts/gitpush.sh"
 
 [ -f "$SCRIPT" ] || { echo "gitpush hook: script not found at $SCRIPT" >&2; exit 0; }
 
-# Auto-generated message from the diff; exits cleanly if there's nothing to do.
-bash "$SCRIPT" -m "chore: auto checkpoint" || true
+# --auto writes the message with the cheap/low-effort model (falls back to a
+# heuristic if unavailable); exits cleanly if there's nothing to do.
+bash "$SCRIPT" --auto || true

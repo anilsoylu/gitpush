@@ -11,6 +11,15 @@
 #
 # Options:
 #   -m, --message MSG   Commit subject (otherwise auto-generated from changes).
+#       --auto          Generate the commit message with the detected tool's
+#                       CHEAPEST setting (Claude -> haiku model + low effort,
+#                       Codex -> low reasoning effort) so the main/expensive
+#                       agent spends ~zero tokens. By default this produces a
+#                       detailed message (subject + bullet body) like
+#                       Cursor/VSCode. Falls back to a heuristic subject if the
+#                       cheap model isn't available.
+#       --no-body       With --auto, produce only the subject line (no bullets).
+#       --body          With --auto, force the detailed bullet body (default).
 #   -n, --no-push       Commit only, skip push.
 #   -a, --no-add        Do not run `git add -A` (commit what's already staged).
 #       --deeplink      ADD a deep-link trailer back to the session/thread
@@ -23,6 +32,10 @@
 #
 # Environment overrides:
 #   GITPUSH_TOOL          Same as --tool.
+#   GITPUSH_AUTO_MSG=1    Same as --auto.
+#   GITPUSH_BODY=0        Same as --no-body (default 1 = detailed body).
+#   GITPUSH_CLAUDE_MODEL  Model for --auto under Claude (default: haiku).
+#   GITPUSH_CODEX_MODEL   Model for --auto under Codex (default: codex's config).
 #   GITPUSH_DEEPLINK=1    Same as --deeplink.
 #   GITPUSH_COAUTHOR=1    Same as --coauthor.
 #
@@ -43,15 +56,20 @@ MESSAGE=""
 DO_PUSH=1
 DO_ADD=1
 DRY_RUN=0
+AUTO_MSG="${GITPUSH_AUTO_MSG:-0}"
+WANT_BODY="${GITPUSH_BODY:-1}"
 ADD_DEEPLINK="${GITPUSH_DEEPLINK:-0}"
 ADD_COAUTHOR="${GITPUSH_COAUTHOR:-0}"
 FORCE_TOOL="${GITPUSH_TOOL:-}"
 
-print_help() { sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; }
+print_help() { sed -n '2,46p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     -m|--message) [ $# -ge 2 ] || die "$1 requires a value"; MESSAGE="$2"; shift 2;;
+    --auto)       AUTO_MSG=1; shift;;
+    --no-body)    WANT_BODY=0; shift;;
+    --body)       WANT_BODY=1; shift;;
     -n|--no-push) DO_PUSH=0; shift;;
     -a|--no-add)  DO_ADD=0; shift;;
     --deeplink)    ADD_DEEPLINK=1; shift;;
@@ -169,6 +187,71 @@ case "$TOOL" in
     ;;
 esac
 
+# ---------- cheap, low-effort commit-message generator (--auto) ----------
+# Generates a Conventional-Commits subject using the detected tool's CHEAPEST
+# model AND lowest effort/thinking, so the expensive interactive agent spends
+# ~zero tokens. Prints the subject; returns non-zero to fall back to heuristics.
+generate_message() {
+  local stat diff body_rule prompt raw subject bullets
+  stat="$(git -C "$REPO_ROOT" diff --cached --stat 2>/dev/null || true)"
+  diff="$(git -C "$REPO_ROOT" diff --cached 2>/dev/null | head -300 || true)"
+  [ -n "$stat" ] || return 1
+
+  if [ "$WANT_BODY" = 1 ]; then
+    body_rule="Then a blank line, then 1-5 bullet points (each starting with '- ') describing WHAT changed and WHY where it's obvious; reference file or directory names where helpful. For a trivial one-line change a single bullet is fine."
+  else
+    body_rule="Do NOT add a body — output only the single subject line."
+  fi
+
+  prompt="Write a git commit message in Conventional Commits style for the staged changes below.
+First line: a type (feat|fix|docs|refactor|perf|test|build|ci|chore) + ': ' + a concise summary; max 72 chars, lowercase type, no trailing period, no quotes.
+$body_rule
+Output ONLY the commit message — no markdown fences, no preamble, no quotes.
+
+=== files (git diff --stat) ===
+$stat
+
+=== diff (truncated) ===
+$diff"
+
+  case "$TOOL" in
+    claude)
+      command -v claude >/dev/null 2>&1 || return 1
+      # haiku model + low effort + thinking disabled.
+      raw="$(printf '%s' "$prompt" | MAX_THINKING_TOKENS=0 claude -p \
+        --model "${GITPUSH_CLAUDE_MODEL:-haiku}" --effort low 2>/dev/null || true)"
+      ;;
+    codex)
+      command -v codex >/dev/null 2>&1 || return 1
+      # low reasoning effort; optional cheaper model via GITPUSH_CODEX_MODEL.
+      local -a cx=(codex exec --skip-git-repo-check -c model_reasoning_effort=low)
+      [ -n "${GITPUSH_CODEX_MODEL:-}" ] && cx+=(-m "$GITPUSH_CODEX_MODEL")
+      raw="$(printf '%s' "$prompt" | "${cx[@]}" 2>/dev/null || true)"
+      ;;
+    *) return 1;;
+  esac
+
+  # Subject = first Conventional-Commits-looking line (skips any log/preamble).
+  subject="$(printf '%s\n' "$raw" \
+    | grep -m1 -iE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?: .+' \
+    || true)"
+  subject="$(printf '%s' "$subject" | cut -c1-100)"
+  [ -n "$subject" ] || return 1
+
+  # Body = the bullet lines anywhere in the output, normalised to "- ".
+  if [ "$WANT_BODY" = 1 ]; then
+    bullets="$(printf '%s\n' "$raw" \
+      | grep -E '^[[:space:]]*[-*][[:space:]]+[^[:space:]]' \
+      | sed -E 's/^[[:space:]]*[-*][[:space:]]+/- /' \
+      | head -8 || true)"
+  fi
+
+  # Caller reads line 1 as the subject and the rest as the body.
+  printf '%s\n' "$subject"
+  [ -n "${bullets:-}" ] && printf '%s\n' "$bullets"
+  return 0
+}
+
 # ---------- stage ----------
 if [ "$DO_ADD" = 1 ]; then
   run git -C "$REPO_ROOT" add -A
@@ -190,16 +273,25 @@ if [ -z "$CHANGED" ]; then
 fi
 
 # ---------- build commit message ----------
+MSG_BODY=""   # optional descriptive body (bullets) from --auto
 if [ -z "$MESSAGE" ]; then
-  COUNT="$(printf '%s\n' "$CHANGED" | grep -c .)"
-  FILES="$(printf '%s\n' "$CHANGED" | head -3 \
-    | awk 'NR>1{printf ", "} {printf "%s", $0} END{print ""}')"
-  [ "$COUNT" -gt 3 ] && FILES="$FILES, …"
-  MESSAGE="chore: update $COUNT file(s) — $FILES"
+  if [ "$AUTO_MSG" = 1 ] && GEN="$(generate_message)"; then
+    MESSAGE="$(printf '%s\n' "$GEN" | head -1)"
+    MSG_BODY="$(printf '%s\n' "$GEN" | tail -n +2 | sed '/^[[:space:]]*$/d')"
+    say "gitpush: auto-message via $TOOL_LABEL (cheap model, low effort)"
+  else
+    [ "$AUTO_MSG" = 1 ] && say "gitpush: --auto unavailable, using heuristic message"
+    COUNT="$(printf '%s\n' "$CHANGED" | grep -c .)"
+    FILES="$(printf '%s\n' "$CHANGED" | head -3 \
+      | awk 'NR>1{printf ", "} {printf "%s", $0} END{print ""}')"
+    [ "$COUNT" -gt 3 ] && FILES="$FILES, …"
+    MESSAGE="chore: update $COUNT file(s) — $FILES"
+  fi
 fi
 
-BODY=""
-add_line() { BODY="${BODY:+$BODY
+# Trailers (deep link / co-author) — both opt-in, off by default.
+TRAILERS=""
+add_line() { TRAILERS="${TRAILERS:+$TRAILERS
 }$1"; }
 
 # Deep link is OFF by default — clean commits like Cursor/VSCode.
@@ -217,11 +309,11 @@ fi
 say "gitpush: tool=$TOOL_LABEL  link=${DEEPLINK:-<none>}"
 say "gitpush: message=\"$MESSAGE\""
 
-if [ -n "$BODY" ]; then
-  run git -C "$REPO_ROOT" commit -m "$MESSAGE" -m "$BODY"
-else
-  run git -C "$REPO_ROOT" commit -m "$MESSAGE"
-fi
+# Each -m becomes its own paragraph: subject / body bullets / trailers.
+COMMIT_ARGS=(commit -m "$MESSAGE")
+[ -n "$MSG_BODY" ]  && COMMIT_ARGS+=(-m "$MSG_BODY")
+[ -n "$TRAILERS" ]  && COMMIT_ARGS+=(-m "$TRAILERS")
+run git -C "$REPO_ROOT" "${COMMIT_ARGS[@]}"
 
 # ---------- push ----------
 if [ "$DO_PUSH" = 1 ]; then
