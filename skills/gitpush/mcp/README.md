@@ -26,7 +26,7 @@ Or clone the repo and use `…/skills/gitpush/mcp/server.js`. Replace
 | `message` | string | Commit subject. Omit when using `auto`. |
 | `auto` | boolean | Let the cheap/low-effort model write the message. |
 | `body` | boolean | With `auto`, include a bullet body (default true). |
-| `push` | boolean | Push after commit (default true). |
+| `push` | boolean | Push to the remote after commit. **Default false over MCP** — set `true` to push. |
 | `deeplink` | boolean | Add a `claude://`/`codex://` trailer (default false). |
 | `coauthor` | boolean | Add a `Co-Authored-By` trailer (default false). |
 | `tool` | `"claude"`\|`"codex"` | Force which AI writes the `auto` message (the target). |

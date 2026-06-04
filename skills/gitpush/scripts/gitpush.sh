@@ -155,7 +155,13 @@ PY
     case "$first" in
       *"\"cwd\":\"$REPO_ROOT\""*)
         id="$(basename "$f" | sed -E 's/.*-([0-9a-f-]{36})\.jsonl$/\1/')"
-        printf '%s' "$id"; return 0;;
+        # Only accept a real UUID; on a sed no-match the basename passes
+        # through unchanged, which must not become a bogus deeplink.
+        case "$id" in
+          [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*-*-*-*)
+            printf '%s' "$id"; return 0;;
+        esac
+        ;;
     esac
   done < <(find "$sessions" -type f -name 'rollout-*.jsonl' 2>/dev/null | sort -r | head -800)
   return 1
@@ -234,7 +240,7 @@ $diff"
   subject="$(printf '%s\n' "$raw" \
     | grep -m1 -iE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?: .+' \
     || true)"
-  subject="$(printf '%s' "$subject" | cut -c1-100)"
+  subject="${subject:0:100}"   # character-safe cap (avoids splitting UTF-8)
   [ -n "$subject" ] || return 1
 
   # Body = the bullet lines anywhere in the output, normalised to "- ".
