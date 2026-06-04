@@ -1,0 +1,120 @@
+# gitpush
+
+[![skills.sh](https://skills.sh/b/anilsoylu/gitpush)](https://skills.sh/anilsoylu/gitpush)
+
+The terminal equivalent of the **"Generate commit message"** button in
+Cursor / VSCode — but for AI coding agents in your terminal.
+
+When you "vibecode" with **Claude Code** or **Codex**, you shouldn't have to
+keep a RAM-hungry GUI editor open just to write a commit message. `gitpush`
+detects which agent you're in, writes a meaningful, change-specific commit
+message, and pushes — **with a clean author identity**.
+
+> No `Co-Authored-By`. No AI profile or avatar on your GitHub commits. The
+> commit stays under **your own identity**, exactly like Cursor/VSCode commits.
+
+## Install
+
+Via the [skills.sh](https://www.skills.sh) CLI:
+
+```bash
+# project-local
+npx skills add anilsoylu/gitpush
+
+# or globally for all repos
+npx skills add -g anilsoylu/gitpush
+
+# target a specific agent
+npx skills add anilsoylu/gitpush --agent claude-code
+npx skills add anilsoylu/gitpush --agent codex
+```
+
+Repo: <https://github.com/anilsoylu/gitpush>
+
+## Use
+
+Just tell your agent:
+
+> gitpush "feat: add login validation"
+
+or simply **"commit and push"** / **"kaydet ve gönder"**. The skill will:
+
+1. Detect the tool (Claude Code vs Codex) from the environment.
+2. `git add -A`.
+3. Commit with your message — **no AI signature**.
+4. `git push` (sets upstream automatically on the first push).
+
+Run the script directly if you like:
+
+```bash
+bash skills/gitpush/scripts/gitpush.sh -m "fix: handle empty cart"
+```
+
+### Options
+
+| Flag | Meaning |
+| --- | --- |
+| `-m "msg"` | Commit subject. |
+| `--no-push` | Commit only. |
+| `--deeplink` | **Opt in** to a `claude://` / `codex://` deep-link trailer (off by default). |
+| `--coauthor` | **Opt in** to a `Co-Authored-By` trailer (off by default). |
+| `--tool claude\|codex` | Force tool detection. |
+| `--dry-run` | Preview without changing anything. |
+
+Everything that puts an AI footprint on the commit is **strictly opt-in**.
+
+## Auto mode (optional)
+
+Want it to commit + push automatically every time the agent finishes? Wire the
+opt-in `Stop` hook. It only fires when `GITPUSH_AUTO=1` is set, so it never
+runs by accident.
+
+> ⚠️ **Heads up:** auto mode runs `git add -A` and pushes unattended. It commits
+> anything not in your `.gitignore` — including `.env` files and secrets. Only
+> turn it on in repos with a solid `.gitignore`, never in one holding
+> credentials.
+
+**Claude Code** — add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command",
+        "command": "GITPUSH_AUTO=1 bash ~/.claude/skills/gitpush/hooks/gitpush-stop-hook.sh" } ] }
+    ]
+  }
+}
+```
+
+**Codex** — point its session-end / stop hook at the same script with
+`GITPUSH_AUTO=1`.
+
+## How tool detection works
+
+- **Claude Code** is detected via `CLAUDECODE=1` / `CLAUDE_CODE_SESSION_ID`.
+- Otherwise the agent context is treated as **Codex**; the thread id (used only
+  for the optional deep link) is resolved from `~/.codex/sessions/**/rollout-*.jsonl`
+  by matching the session's `cwd` to the current repo.
+- Override anytime with `--tool claude|codex`.
+
+## Requirements
+
+- `git`
+- `python3` (optional — only speeds up Codex thread resolution; there's a pure
+  shell fallback).
+
+## Layout
+
+```
+gitpush/
+└── skills/
+    └── gitpush/
+        ├── SKILL.md                  # skill definition (skills.sh / Agent Skills format)
+        ├── scripts/gitpush.sh        # core: detect → add → commit → push
+        └── hooks/gitpush-stop-hook.sh# optional opt-in auto mode
+```
+
+## License
+
+[MIT](./LICENSE) © Anil Soylu
