@@ -2,16 +2,14 @@
 
 [![skills.sh](https://skills.sh/b/anilsoylu/gitpush)](https://skills.sh/anilsoylu/gitpush)
 
-The terminal equivalent of the **"Generate commit message"** button in
-Cursor / VSCode — but for AI coding agents in your terminal.
+Stage, commit, and push in one step from inside an AI coding agent.
 
-When you "vibecode" with **Claude Code** or **Codex**, you shouldn't have to
-keep a RAM-hungry GUI editor open just to write a commit message. `gitpush`
-detects which agent you're in, writes a meaningful, change-specific commit
-message, and pushes — **with a clean author identity**.
+`gitpush` detects whether you're in **Claude Code** or **Codex**, writes a
+meaningful, change-specific commit message, and pushes — **with a clean author
+identity**.
 
 > No `Co-Authored-By`. No AI profile or avatar on your GitHub commits. The
-> commit stays under **your own identity**, exactly like Cursor/VSCode commits.
+> commit stays under **your own identity**.
 
 ## Install
 
@@ -85,8 +83,8 @@ model or effort** — your Opus/high-effort session stays exactly as it is. If t
 cheap model can't be reached, it falls back to a heuristic message. Tune the
 model via `GITPUSH_CLAUDE_MODEL` / `GITPUSH_CODEX_MODEL`.
 
-By default `--auto` writes a **detailed, Cursor/VSCode-style message** — a
-Conventional-Commits subject plus a bullet body describing each change:
+By default `--auto` writes a **detailed message** — a Conventional-Commits
+subject plus a bullet body describing each change:
 
 ```
 feat: add navigation link for documentation and update ignore files

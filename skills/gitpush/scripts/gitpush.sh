@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# gitpush.sh — the terminal equivalent of the "AI commit message" button in
-# Cursor/VSCode. Auto-detects the running AI coding tool (Claude Code or Codex),
-# stages everything, writes a clean commit (NO Co-Authored-By, NO AI profile on
+# gitpush.sh — stage, commit, and push in one step from inside an AI coding
+# agent. Auto-detects the running tool (Claude Code or Codex), stages
+# everything, writes a clean commit (NO Co-Authored-By, NO AI profile on
 # GitHub), and pushes.
 #
 # Usage:
@@ -15,15 +15,14 @@
 #                       CHEAPEST setting (Claude -> haiku model + low effort,
 #                       Codex -> low reasoning effort) so the main/expensive
 #                       agent spends ~zero tokens. By default this produces a
-#                       detailed message (subject + bullet body) like
-#                       Cursor/VSCode. Falls back to a heuristic subject if the
-#                       cheap model isn't available.
+#                       detailed message (subject + bullet body). Falls back to
+#                       a heuristic subject if the cheap model isn't available.
 #       --no-body       With --auto, produce only the subject line (no bullets).
 #       --body          With --auto, force the detailed bullet body (default).
 #   -n, --no-push       Commit only, skip push.
 #   -a, --no-add        Do not run `git add -A` (commit what's already staged).
 #       --deeplink      ADD a deep-link trailer back to the session/thread
-#                       (off by default — keeps commits clean like Cursor/VSCode).
+#                       (off by default).
 #       --coauthor      ADD a Co-Authored-By trailer (off by default, since it
 #                       makes the AI profile/avatar show up on GitHub).
 #       --tool TOOL     Force tool detection: claude | codex.
@@ -294,7 +293,7 @@ TRAILERS=""
 add_line() { TRAILERS="${TRAILERS:+$TRAILERS
 }$1"; }
 
-# Deep link is OFF by default — clean commits like Cursor/VSCode.
+# Deep link is OFF by default.
 if [ "$ADD_DEEPLINK" = "1" ] && [ -n "$DEEPLINK" ]; then
   case "$TOOL" in
     claude) add_line "Claude-Session: $DEEPLINK";;

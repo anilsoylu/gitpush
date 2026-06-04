@@ -1,32 +1,28 @@
 ---
 name: gitpush
 description: >-
-  Stage, commit, and push in one step from inside an AI coding agent — the
-  terminal equivalent of the "AI commit message" feature in Cursor/VSCode, so
-  you don't have to keep a RAM-heavy GUI editor open just to generate commits.
-  Use when the user says "gitpush", "commit and push", "push my changes",
-  "kaydet ve gönder", or wants a quick commit+push. Auto-detects whether it is
-  running in Claude Code or Codex, writes a meaningful, change-specific commit
-  message, and pushes. By design it does NOT add a Co-Authored-By trailer, so no
-  AI profile or avatar appears on the commit in GitHub — the commit stays clean
-  under the user's own identity, exactly like Cursor/VSCode commits do.
+  Stage, commit, and push in one step from inside an AI coding agent. Use when
+  the user says "gitpush", "commit and push", "push my changes", "kaydet ve
+  gönder", or wants a quick commit+push. Auto-detects whether it is running in
+  Claude Code or Codex, writes a meaningful, change-specific commit message, and
+  pushes. By design it does NOT add a Co-Authored-By trailer, so no AI profile
+  or avatar appears on the commit in GitHub — the commit stays under the user's
+  own identity. A Co-Authored-By trailer and a session deep link are opt-in.
 ---
 
 # gitpush
 
 One command to `git add` + `git commit` + `git push` from inside an AI coding
-agent — a clean, AI-signature-free commit, like the "Generate commit message"
-button in Cursor/VSCode but without keeping those editors open.
+agent, with a clean author identity and no AI signature.
 
 ## What it does
 
 1. Detects the host tool from the environment (Claude Code vs Codex).
 2. Stages all changes (`git add -A`).
-3. Writes a **meaningful, repo-specific commit message** (you provide it — see
-   below).
+3. Writes a **meaningful, repo-specific commit message** (you provide it, or let
+   `--auto` generate it — see below).
 4. Commits **without** a `Co-Authored-By` trailer, so the commit shows up under
-   the user's own GitHub identity with no AI profile/avatar attached — exactly
-   like commits made through Cursor/VSCode.
+   the user's own GitHub identity with no AI profile/avatar attached.
 5. Pushes (creates upstream with `-u origin <branch>` on first push).
 
 Both a `Co-Authored-By` trailer and a deep link back to the session/thread are
@@ -51,8 +47,8 @@ Codex → `model_reasoning_effort=low`). You don't read the diff at all:
 bash "$SKILL_DIR/scripts/gitpush.sh" --auto
 ```
 
-By default this produces a **detailed message like Cursor/VSCode** — a
-Conventional-Commits subject plus a bullet-point body explaining the changes:
+By default this produces a **detailed message** — a Conventional-Commits
+subject plus a bullet-point body explaining the changes:
 
 ```
 feat: add navigation link for documentation and update ignore files
@@ -99,9 +95,8 @@ uses.
 
 - **No `Co-Authored-By` by default** — this is the whole point: keep the AI
   profile off the commit. Only `--coauthor` (or `GITPUSH_COAUTHOR=1`) adds it.
-- **No deep link by default** — clean commits like Cursor/VSCode. Only
-  `--deeplink` (or `GITPUSH_DEEPLINK=1`) appends a `claude://`/`codex://`
-  trailer.
+- **No deep link by default.** Only `--deeplink` (or `GITPUSH_DEEPLINK=1`)
+  appends a `claude://`/`codex://` trailer.
 
 ## Auto mode (optional hook)
 
