@@ -39,7 +39,9 @@ or simply **"commit and push"** / **"kaydet ve gönder"**. The skill will:
 
 1. Detect the tool (Claude Code vs Codex) from the environment.
 2. `git add -A`.
-3. Commit with your message — **no AI signature**.
+3. Commit — **no AI signature**. Give exact wording and it's used verbatim;
+   say nothing and `--auto` writes a meaningful, change-specific message for you
+   (subject + bullet body) at ~zero tokens from your main session.
 4. `git push` (sets upstream automatically on the first push).
 
 Run the script directly if you like:

@@ -34,12 +34,20 @@ neither, so there is zero AI footprint.
 The core logic lives in `scripts/gitpush.sh`. `$SKILL_DIR` below is the
 directory containing this SKILL.md (the script ships under `scripts/`).
 
-There are two ways to set the commit message. **Prefer the cheap mode** — it
-keeps your (expensive) context clean.
+**Default action.** When the user just says "gitpush" (or "kaydet ve gönder")
+and does NOT dictate exact commit wording, ALWAYS run `--auto`. Do not write the
+message yourself and do not read the diff — `--auto` generates a meaningful,
+change-specific message with the cheap model at ~zero tokens from you:
 
-### Cheap mode — `--auto` (recommended, ~zero tokens from you)
+```bash
+bash "$SKILL_DIR/scripts/gitpush.sh" --auto
+```
 
-Let the script write the message itself using the detected tool's CHEAPEST
+Only use the manual `-m` mode below when the user gives you the exact wording.
+
+### Cheap mode — `--auto` (the default, ~zero tokens from you)
+
+The script writes the message itself using the detected tool's CHEAPEST
 model and LOWEST effort (Claude → `haiku` + `--effort low` + thinking off;
 Codex → `model_reasoning_effort=low`). You don't read the diff at all:
 
@@ -80,18 +88,16 @@ Whenever the user names a tool alongside the gitpush request, treat it as the
 target and pass it via `--tool`. The named tool's CLI must be installed; if it
 isn't reachable, gitpush falls back to a heuristic message.
 
-### Manual mode — `-m` (when you want exact wording)
+### Manual mode — `-m` (only when the user dictates exact wording)
 
-If you write the message yourself, **do NOT read the full diff** (it burns
-tokens). Look only at `git -C <repo> status --short` and
-`git -C <repo> diff --stat`; that's enough for a good subject. Then:
+When the user hands you the exact commit subject, pass it through verbatim:
 
 ```bash
 bash "$SKILL_DIR/scripts/gitpush.sh" -m "feat: add login form validation"
 ```
 
-Use a concise Conventional-Commits subject (`feat:`, `fix:`, `docs:`, …). Never
-use generic messages like "update files".
+If the user did NOT give exact wording, prefer `--auto` instead of inventing a
+subject from filenames — that is what produces generic, mislabelled messages.
 
 ### Common options
 

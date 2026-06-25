@@ -197,9 +197,13 @@ esac
 # model AND lowest effort/thinking, so the expensive interactive agent spends
 # ~zero tokens. Prints the subject; returns non-zero to fall back to heuristics.
 generate_message() {
-  local stat diff body_rule prompt raw subject bullets
+  local stat diff full body_rule prompt raw subject bullets
   stat="$(git -C "$REPO_ROOT" diff --cached --stat 2>/dev/null || true)"
-  diff="$(git -C "$REPO_ROOT" diff --cached 2>/dev/null | head -300 || true)"
+  full="$(git -C "$REPO_ROOT" diff --cached 2>/dev/null || true)"
+  diff="$(printf '%s\n' "$full" | head -500)"
+  # Tell the model when the diff was cut, so it describes only what it sees.
+  [ "$(printf '%s\n' "$full" | wc -l)" -gt 500 ] && diff="$diff
+... [diff truncated]"
   [ -n "$stat" ] || return 1
 
   if [ "$WANT_BODY" = 1 ]; then
@@ -209,14 +213,17 @@ generate_message() {
   fi
 
   prompt="Write a git commit message in Conventional Commits style for the staged changes below.
-First line: a type (feat|fix|docs|refactor|perf|test|build|ci|chore) + ': ' + a concise summary; max 72 chars, lowercase type, no trailing period, no quotes.
+First line: a type + ': ' + a concise summary; max 72 chars, lowercase type, no trailing period, no quotes.
+Pick the MOST SPECIFIC type from: feat (new capability), fix (bug fix), docs, style, refactor (behaviour-preserving restructure ONLY), perf, test, build, ci, chore, revert. If new code adds behaviour it is feat, not refactor; if it corrects wrong behaviour it is fix.
+Use imperative present tense ('add', 'remove', 'replace', 'rename', 'guard', 'validate'). Describe WHAT the diff actually changes — never vague filler like 'improve', 'update', 'enhance', 'various', 'changes', 'misc', or 'readability'.
 $body_rule
+The diff may be truncated; describe only changes you can see and do not overstate scope ('comprehensive', 'various') for parts you cannot see.
 Output ONLY the commit message — no markdown fences, no preamble, no quotes.
 
 === files (git diff --stat) ===
 $stat
 
-=== diff (truncated) ===
+=== diff (may be truncated) ===
 $diff"
 
   case "$TOOL" in
@@ -240,6 +247,10 @@ $diff"
   subject="$(printf '%s\n' "$raw" \
     | grep -m1 -iE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?: .+' \
     || true)"
+  # If the model emitted no recognised type, take its first non-empty line —
+  # still better than the generic "chore: update N files" heuristic.
+  [ -n "$subject" ] || subject="$(printf '%s\n' "$raw" \
+    | grep -m1 -E '[^[:space:]]' | sed -E 's/^[[:space:]]+//' || true)"
   subject="${subject:0:100}"   # character-safe cap (avoids splitting UTF-8)
   [ -n "$subject" ] || return 1
 
